@@ -144,7 +144,7 @@ MCmdLogger acts as a proxy between Minecraft clients and servers, allowing you t
 
 ```bash
 git clone https://github.com/markdip/MCMDLogger-UI
-cd mcmdgui
+cd MCMDLogger-UI
 ```
 
 ### Step 2: Download MCmdLogger
@@ -399,4 +399,5 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 <p align="center">
   Made with ❤️ for the Minecraft community
 </p>
+
 
