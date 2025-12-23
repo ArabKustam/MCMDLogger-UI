@@ -7,15 +7,7 @@ const IntegrationManager = require('./integrations');
 
 let mainWindow;
 let mcmdProcess = null;
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-const { spawn } = require('child_process');
-const IntegrationManager = require('./integrations');
 
-let mainWindow;
-let mcmdProcess = null;
 let integrations = null;
 
 // Determine paths based on environment (packaged or dev)
@@ -30,7 +22,7 @@ const settingsPath = path.join(userDataPath, 'script-settings.json');
 // Read-only paths (Resources)
 const templatesDir = path.join(resourcesPath, 'scripts-templates');
 const catalogPath = path.join(resourcesPath, 'scripts-catalog.json');
-const exePath = isPackaged 
+const exePath = isPackaged
     ? path.join(resourcesPath, 'mcmdlogger-neo.exe')
     : path.join(__dirname, 'mcmdlogger-neo.exe');
 
@@ -398,8 +390,8 @@ ipcMain.handle('install-script', async (event, scriptId, filename) => {
             // Fallback for dev mode where resources might be in root
             const devSourcePath = path.join(__dirname, 'scripts-templates', filename);
             if (!isPackaged && fs.existsSync(devSourcePath)) {
-                 fs.copyFileSync(devSourcePath, destPath);
-                 return { success: true, path: destPath };
+                fs.copyFileSync(devSourcePath, destPath);
+                return { success: true, path: destPath };
             }
             return { success: false, error: `Template not found: ${filename}` };
         }
@@ -453,8 +445,8 @@ ipcMain.handle('get-script-catalog', () => {
         }
         // Fallback for dev environment
         const devCatalogPath = path.join(__dirname, 'scripts-catalog.json');
-        if (fs.existsSync(devCatalogPath)){
-             return JSON.parse(fs.readFileSync(devCatalogPath, 'utf8'));
+        if (fs.existsSync(devCatalogPath)) {
+            return JSON.parse(fs.readFileSync(devCatalogPath, 'utf8'));
         }
 
     } catch (err) {
