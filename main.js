@@ -7,7 +7,46 @@ const IntegrationManager = require('./integrations');
 
 let mainWindow;
 let mcmdProcess = null;
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const https = require('https');
+const { spawn } = require('child_process');
+const IntegrationManager = require('./integrations');
+
+let mainWindow;
+let mcmdProcess = null;
 let integrations = null;
+
+// Determine paths based on environment (packaged or dev)
+const isPackaged = app.isPackaged;
+const resourcesPath = isPackaged ? process.resourcesPath : __dirname;
+const userDataPath = app.getPath('userData');
+
+// Writable paths (User Data)
+const scriptsDir = path.join(userDataPath, 'scripts');
+const settingsPath = path.join(userDataPath, 'script-settings.json');
+
+// Read-only paths (Resources)
+const templatesDir = path.join(resourcesPath, 'scripts-templates');
+const catalogPath = path.join(resourcesPath, 'scripts-catalog.json');
+const exePath = isPackaged 
+    ? path.join(resourcesPath, 'mcmdlogger-neo.exe')
+    : path.join(__dirname, 'mcmdlogger-neo.exe');
+
+// Ensure writable directories exist
+if (!fs.existsSync(scriptsDir)) {
+    fs.mkdirSync(scriptsDir, { recursive: true });
+}
+
+// Ensure settings file exists with default empty object if not present
+if (!fs.existsSync(settingsPath)) {
+    try {
+        fs.writeFileSync(settingsPath, '{}', 'utf8');
+    } catch (e) {
+        console.error('Failed to initialize settings:', e);
+    }
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -160,7 +199,8 @@ ipcMain.on('close-window', () => {
 
 // Start MCmdLogger process
 ipcMain.on('start-mcmd', (event, { port, targetServer }) => {
-    const exePath = path.join(__dirname, 'mcmdlogger-neo.exe');
+    // exePath is defined globally now
+    console.log('Starting backend from:', exePath);
 
     try {
         // Start the process hidden (no window)
@@ -344,14 +384,10 @@ ipcMain.handle('send-test-notification', async (event) => {
 // ===================================
 
 // Install script from local templates
+// Install script from local templates
 ipcMain.handle('install-script', async (event, scriptId, filename) => {
-    const scriptsDir = path.join(__dirname, 'scripts');
-    const templatesDir = path.join(__dirname, 'scripts-templates');
-
-    // Ensure scripts directory exists
-    if (!fs.existsSync(scriptsDir)) {
-        fs.mkdirSync(scriptsDir);
-    }
+    // content of templatesDir is read-only source
+    // content of scriptsDir is writable destination
 
     const sourcePath = path.join(templatesDir, filename);
     const destPath = path.join(scriptsDir, filename);
@@ -359,6 +395,12 @@ ipcMain.handle('install-script', async (event, scriptId, filename) => {
     try {
         // Check if template exists
         if (!fs.existsSync(sourcePath)) {
+            // Fallback for dev mode where resources might be in root
+            const devSourcePath = path.join(__dirname, 'scripts-templates', filename);
+            if (!isPackaged && fs.existsSync(devSourcePath)) {
+                 fs.copyFileSync(devSourcePath, destPath);
+                 return { success: true, path: destPath };
+            }
             return { success: false, error: `Template not found: ${filename}` };
         }
 
@@ -371,9 +413,8 @@ ipcMain.handle('install-script', async (event, scriptId, filename) => {
 });
 
 // Get installed scripts
+// Get installed scripts
 ipcMain.handle('get-installed-scripts', () => {
-    const scriptsDir = path.join(__dirname, 'scripts');
-
     if (!fs.existsSync(scriptsDir)) {
         return [];
     }
@@ -387,8 +428,9 @@ ipcMain.handle('get-installed-scripts', () => {
 });
 
 // Delete script
+// Delete script
 ipcMain.handle('delete-script', (event, filename) => {
-    const filePath = path.join(__dirname, 'scripts', filename);
+    const filePath = path.join(scriptsDir, filename);
 
     try {
         if (fs.existsSync(filePath)) {
@@ -402,12 +444,19 @@ ipcMain.handle('delete-script', (event, filename) => {
 });
 
 // Load script catalog
+// Load script catalog
 ipcMain.handle('get-script-catalog', () => {
     try {
-        const catalogPath = path.join(__dirname, 'scripts-catalog.json');
+        // Try global catalog path first
         if (fs.existsSync(catalogPath)) {
             return JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
         }
+        // Fallback for dev environment
+        const devCatalogPath = path.join(__dirname, 'scripts-catalog.json');
+        if (fs.existsSync(devCatalogPath)){
+             return JSON.parse(fs.readFileSync(devCatalogPath, 'utf8'));
+        }
+
     } catch (err) {
         console.error('Error loading script catalog:', err);
     }
@@ -415,9 +464,10 @@ ipcMain.handle('get-script-catalog', () => {
 });
 
 // Read script content for editor
+// Read script content for editor
 ipcMain.handle('read-script', (event, filename) => {
     try {
-        const filePath = path.join(__dirname, 'scripts', filename);
+        const filePath = path.join(scriptsDir, filename);
         if (fs.existsSync(filePath)) {
             const content = fs.readFileSync(filePath, 'utf8');
             return { success: true, content: content };
@@ -429,9 +479,10 @@ ipcMain.handle('read-script', (event, filename) => {
 });
 
 // Save script content from editor
+// Save script content from editor
 ipcMain.handle('save-script', (event, filename, content) => {
     try {
-        const filePath = path.join(__dirname, 'scripts', filename);
+        const filePath = path.join(scriptsDir, filename);
         fs.writeFileSync(filePath, content, 'utf8');
         return { success: true };
     } catch (err) {
@@ -440,9 +491,9 @@ ipcMain.handle('save-script', (event, filename, content) => {
 });
 
 // Get script integration settings
+// Get script integration settings
 ipcMain.handle('get-script-settings', () => {
     try {
-        const settingsPath = path.join(__dirname, 'script-settings.json');
         if (fs.existsSync(settingsPath)) {
             return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
         }
@@ -453,9 +504,9 @@ ipcMain.handle('get-script-settings', () => {
 });
 
 // Save script integration settings
+// Save script integration settings
 ipcMain.handle('save-script-settings', (event, settings) => {
     try {
-        const settingsPath = path.join(__dirname, 'script-settings.json');
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
         return { success: true };
     } catch (err) {

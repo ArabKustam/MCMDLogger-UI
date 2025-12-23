@@ -5,7 +5,19 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --enable-logging"
+    "dev": "electron . --enable-logging",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.mcmdlogger.gui",
+    "win": {
+      "target": "portable"
+    },
+    "extraResources": [
+      "mcmdlogger-neo.exe",
+      "scripts-templates/**",
+      "scripts-catalog.json"
+    ]
   },
   "keywords": [
     "minecraft",
@@ -16,7 +28,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^39.2.6"
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
     "axios": "^1.13.2",
